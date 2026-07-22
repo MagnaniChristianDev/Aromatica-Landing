@@ -105,11 +105,23 @@
     var isAndroid = /Android/.test(ua);
     var content = document.getElementById('content');
 
+    // --- Conteggio scan per sistema operativo (GoatCounter, no cookie/no dati personali) ---
+    // Etichetta lo scan: /scan/android, /scan/ios oppure /scan/altro.
+    // La dashboard mostra quanti iPhone vs Android hanno scansionato la tessera.
+    var osLabel = isAndroid ? 'android' : (isIOS ? 'ios' : 'altro');
+    window.goatcounter = { path: '/scan/' + osLabel };
+  </script>
+  <script data-goatcounter="https://aromatica.goatcounter.com/count"
+          async src="//gc.zgo.at/count.js"></script>
+
+  <script>
     if (isAndroid) {
       content.innerHTML =
         '<p class="status">Ti stiamo portando su Google Play…</p>' +
         '<a class="btn" href="' + PLAY_STORE_URL + '">Apri su Google Play</a>';
-      window.location.href = PLAY_STORE_URL;
+      // Piccolo ritardo: dà tempo al conteggio (async) di partire prima del redirect,
+      // così gli scan Android non vengono persi. Chi vuole può toccare subito il pulsante.
+      setTimeout(function () { window.location.href = PLAY_STORE_URL; }, 800);
     } else if (isIOS) {
       content.innerHTML =
         '<p class="status">📱 Stiamo lavorando alla versione per iPhone.<br>Torna a trovarci presto!</p>' +
