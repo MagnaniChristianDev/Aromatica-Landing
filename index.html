@@ -109,7 +109,18 @@
     // Etichetta lo scan: /scan/android, /scan/ios oppure /scan/altro.
     // La dashboard mostra quanti iPhone vs Android hanno scansionato la tessera.
     var osLabel = isAndroid ? 'android' : (isIOS ? 'ios' : 'altro');
-    window.goatcounter = { path: '/scan/' + osLabel };
+
+    // Chi arriva dai social ha ?src=... nel link (pinterest, instagram): lo contiamo
+    // a parte come /social/<src>/<os>, così non si mescola con gli scan delle tessere.
+    // Le tessere non hanno parametro e restano /scan/<os>, come prima.
+    // Il try/catch garantisce che, anche su un browser vecchissimo, si ricada su
+    // /scan/ senza mai interrompere lo script.
+    var src = '';
+    try {
+      src = (new URLSearchParams(window.location.search).get('src') || '')
+        .toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+    } catch (e) { src = ''; }
+    window.goatcounter = { path: (src ? '/social/' + src + '/' : '/scan/') + osLabel };
   </script>
   <script data-goatcounter="https://aromatica.goatcounter.com/count"
           async src="//gc.zgo.at/count.js"></script>
