@@ -120,19 +120,65 @@
       src = (new URLSearchParams(window.location.search).get('src') || '')
         .toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
     } catch (e) { src = ''; }
-    window.goatcounter = { path: (src ? '/social/' + src + '/' : '/scan/') + osLabel };
-  </script>
-  <script data-goatcounter="https://aromatica.goatcounter.com/count"
-          async src="//gc.zgo.at/count.js"></script>
+    var countPath = (src ? '/social/' + src + '/' : '/scan/') + osLabel;
 
-  <script>
+    // Il conteggio parte subito, senza aspettare di scaricare count.js da un altro
+    // server: con il 4G debole dentro un vivaio lo script poteva arrivare dopo il
+    // redirect e lo scan andava perso. Mandiamo gli stessi dati che manderebbe
+    // count.js, direttamente all'endpoint di GoatCounter.
+    // onSent viene chiamata una sola volta, quando è sicuro lasciare la pagina.
+    function countVisit(onSent) {
+      var done = false;
+      function finish() { if (!done) { done = true; if (onSent) onSent(); } }
+
+      // Come faceva count.js: le prove in locale non finiscono nelle statistiche.
+      if (!/^https?:$/.test(window.location.protocol) ||
+          /^(localhost|127\.|\[?::1\]?$)/.test(window.location.hostname)) {
+        finish();
+        return;
+      }
+
+      var data = {
+        p: countPath,
+        r: document.referrer,
+        t: document.title,
+        s: window.screen.width,
+        q: window.location.search,
+        b: navigator.webdriver ? 153 : 0,
+        rnd: Math.random().toString(36).slice(2, 7)  // anti-cache
+      };
+      var qs = [];
+      for (var k in data) {
+        if (data[k] !== '' && data[k] !== null && data[k] !== undefined)
+          qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(data[k]));
+      }
+      var url = 'https://aromatica.goatcounter.com/count?' + qs.join('&');
+
+      // sendBeacon: il browser consegna la richiesta anche dopo che la pagina è
+      // stata lasciata, quindi si può fare il redirect quasi subito.
+      try {
+        if (navigator.sendBeacon && navigator.sendBeacon(url)) {
+          setTimeout(finish, 300);
+          return;
+        }
+      } catch (e) {}
+
+      // Browser senza sendBeacon: pixel-immagine, e si aspetta la risposta
+      // (o l'errore, es. blocco pubblicità) prima di andare avanti.
+      var img = new Image();
+      img.onload = finish;
+      img.onerror = finish;
+      img.src = url;
+      setTimeout(finish, 1500);  // tetto massimo: mai lasciare l'utente fermo qui
+    }
+
     if (isAndroid) {
       content.innerHTML =
         '<p class="status">Ti stiamo portando su Google Play…</p>' +
         '<a class="btn" href="' + PLAY_STORE_URL + '">Apri su Google Play</a>';
-      // Piccolo ritardo: dà tempo al conteggio (async) di partire prima del redirect,
-      // così gli scan Android non vengono persi. Chi vuole può toccare subito il pulsante.
-      setTimeout(function () { window.location.href = PLAY_STORE_URL; }, 800);
+      // Redirect solo dopo che il conteggio è partito (max 1,5 s su rete lenta).
+      // Chi vuole può toccare subito il pulsante.
+      countVisit(function () { window.location.href = PLAY_STORE_URL; });
     } else if (isIOS) {
       content.innerHTML =
         '<p class="status">📱 Stiamo lavorando alla versione per iPhone.<br>Torna a trovarci presto!</p>' +
@@ -144,11 +190,13 @@
         '</ul>' +
         '<p class="note">Vuoi sapere quando arriva su iOS? Scrivici a<br>' +
           '<a class="mail" href="mailto:magnani.christian.dev@gmail.com?subject=Aromatica%20iOS">magnani.christian.dev@gmail.com</a></p>';
+      countVisit();
     } else {
       content.innerHTML =
         '<p class="status">Aromatica è disponibile su Android.</p>' +
         '<a class="btn" href="' + PLAY_STORE_URL + '">Scarica su Google Play</a>' +
         '<p class="note">📱 La versione per iPhone è in lavorazione.</p>';
+      countVisit();
     }
   </script>
 </body>
